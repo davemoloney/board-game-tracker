@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Board Game Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #101418;
+      --panel: #171d23;
+      --panel2: #202832;
+      --text: #f4f7fa;
+      --muted: #aeb8c2;
+      --green: #2ecc71;
+      --red: #e74c3c;
+      --yellow: #f1c40f;
+      --blue: #3498db;
+      --purple: #9b59b6;
+      --border: #2c3642;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(135deg, #0e1216, #1b2430);
+      color: var(--text);
+    }
+
+    header {
+      padding: 28px 24px;
+      background: #0b0f13;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 { margin: 0; font-size: 32px; }
+    header p { margin: 8px 0 0; color: var(--muted); }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 16px 24px;
+      background: #111820;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    nav button, .primary, .secondary, .danger {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      color: white;
+      font-weight: 700;
+    }
+
+    nav button { background: var(--panel2); }
+    nav button.active { background: var(--blue); }
+    .primary { background: var(--blue); }
+    .secondary { background: #52606d; }
+    .danger { background: var(--red); }
+
+    main { padding: 24px; }
+    section { display: none; }
+    section.active { display: block; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: rgba(23, 29, 35, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+      margin-bottom: 18px;
+    }
+
+    .card h2, .card h3 { margin-top: 0; }
+
+    .stat {
+      font-size: 34px;
+      font-weight: 800;
+      margin: 6px 0;
+    }
+
+    .muted { color: var(--muted); }
+
+    label {
+      display: block;
+      margin: 10px 0 5px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #0e141a;
+      color: var(--text);
+    }
+
+    textarea { min-height: 70px; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+
+    .filter-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 14px;
+    }
+
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th { background: #101820; color: var(--muted); }
+    tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+    .win { background: rgba(46,204,113,0.25) !important; color: #dfffea; font-weight: 700; }
+    .loss { background: rgba(231,76,60,0.25) !important; color: #ffe6e2; font-weight: 700; }
+    .draw { background: rgba(241,196,15,0.25) !important; color: #fff7d7; font-weight: 700; }
+
+    canvas { max-height: 360px; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: var(--panel2);
+      color: var(--muted);
+      font-size: 12px;
+      margin: 3px;
+    }
+
+    .small { font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎲 Board Game Tracker</h1>
+    <p>David vs Katrina rivalry, family game nights, ELO ratings, streaks, filters, date sorting, timelines, leaderboards, and game ownership.</p>
+  </header>
+
+  <nav>
+    <button class="active" onclick="showTab('dashboard', this)">🏆 Dashboard</button>
+    <button onclick="showTab('dvk', this)">David vs Katrina</button>
+    <button onclick="showTab('multi', this)">Game Night</button>
+    <button onclick="showTab('stats', this)">Stats</button>
+    <button onclick="showTab('settings', this)">Settings</button>
+  </nav>
+
+  <main>
+    <section id="dashboard" class="active">
+      <div class="grid">
+        <div class="card"><h3>David ELO</h3><div class="stat" id="dashDavidElo">1000</div></div>
+        <div class="card"><h3>Katrina ELO</h3><div class="stat" id="dashKatrinaElo">1000</div></div>
+        <div class="card"><h3>Current Streak</h3><div class="stat" id="dashStreak">—</div></div>
+        <div class="card"><h3>Total Logged Entries</h3><div class="stat" id="dashTotalGames">0</div></div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h2>📈 ELO Timeline</h2>
+          <canvas id="eloChart"></canvas>
+        </div>
+        <div class="card">
+          <h2>📅 Performance Timeline</h2>
+          <canvas id="timelineChart"></canvas>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h2>🏆 Wins by Player</h2>
+          <canvas id="winsChart"></canvas>
+        </div>
+        <div class="card">
+          <h2>🎯 Who Owns Which Game?</h2>
+          <table id="ownershipTable"></table>
+        </div>
+      </div>
+    </section>
+
+    <section id="dvk">
+      <div class="card">
+        <h2>David vs Katrina</h2>
+        <p class="muted">Newest games appear at the top. Add old games anytime and the sheet will auto-sort by date.</p>
+        <div class="form-grid">
+          <div><label>Date</label><input type="date" id="dvkDate"></div>
+          <div><label>Game</label><input list="gameList" id="dvkGame" placeholder="Scrabble"></div>
+          <div><label>Game Type</label><select id="dvkType"><option>Score</option><option>Win/Loss</option></select></div>
+          <div><label>David Score</label><input type="number" id="dvkDavidScore"></div>
+          <div><label>Katrina Score</label><input type="number" id="dvkKatrinaScore"></div>
+          <div><label>Winner</label><select id="dvkWinner"><option value="">Auto / Select</option><option>David</option><option>Katrina</option><option>Draw</option></select></div>
+          <div><button class="primary" onclick="addDvkGame()">Add Game</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Filters</h2>
+        <div class="filter-grid">
+          <div><label>Game</label><select id="dvkFilterGame" onchange="renderAll()"></select></div>
+          <div><label>Winner</label><select id="dvkFilterWinner" onchange="renderAll()"><option value="">All</option><option>David</option><option>Katrina</option><option>Draw</option></select></div>
+          <div><label>From</label><input type="date" id="dvkFilterFrom" onchange="renderAll()"></div>
+          <div><label>To</label><input type="date" id="dvkFilterTo" onchange="renderAll()"></div>
+          <div><button class="secondary" onclick="clearDvkFilters()">Clear Filters</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Game Log</h2>
+        <table id="dvkTable"></table>
+      </div>
+    </section>
+
+    <section id="multi">
+      <div class="card">
+        <h2>Game Night: Kids & Friends</h2>
+        <p class="muted">Add one row per player per game. Works for any number of players.</p>
+        <div class="form-grid">
+          <div><label>Date</label><input type="date" id="multiDate"></div>
+          <div><label>Game</label><input list="gameList" id="multiGame"></div>
+          <div><label>Player</label><select id="multiPlayer"></select></div>
+          <div><label>Score</label><input type="number" id="multiScore"></div>
+          <div><label>Result</label><select id="multiResult"><option>Win</option><option>Loss</option><option>Draw</option></select></div>
+          <div><button class="primary" onclick="addMultiRow()">Add Player Result</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Filters</h2>
+        <div class="filter-grid">
+          <div><label>Game</label><select id="multiFilterGame" onchange="renderAll()"></select></div>
+          <div><label>Player</label><select id="multiFilterPlayer" onchange="renderAll()"></select></div>
+          <div><label>Result</label><select id="multiFilterResult" onchange="renderAll()"><option value="">All</option><option>Win</option><option>Loss</option><option>Draw</option></select></div>
+          <div><label>From</label><input type="date" id="multiFilterFrom" onchange="renderAll()"></div>
+          <div><label>To</label><input type="date" id="multiFilterTo" onchange="renderAll()"></div>
+          <div><button class="secondary" onclick="clearMultiFilters()">Clear Filters</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Multiplayer Log</h2>
+        <table id="multiTable"></table>
+      </div>
+    </section>
+
+    <section id="stats">
+      <div class="card">
+        <h2>Player Stats</h2>
+        <table id="statsTable"></table>
+      </div>
+    </section>
+
+    <section id="settings">
+      <div class="card">
+        <h2>Settings</h2>
+        <p class="muted">Current players are restricted to:</p>
+        <p id="playerPills"></p>
+        <div class="toolbar">
+          <button class="secondary" onclick="exportData()">Export Data</button>
+          <button class="danger" onclick="clearData()">Clear All Data</button>
+        </div>
+        <p class="muted small">Games can be added by simply typing a new game name when logging a result.</p>
+      </div>
+    </section>
+  </main>
+
+  <datalist id="gameList">
+    <option value="Timber Town"></option>
+    <option value="Hive"></option>
+    <option value="Scrabble"></option>
+    <option value="Rummikub"></option>
+    <option value="Skip-Bo"></option>
+    <option value="Sea Salt & Paper"></option>
+    <option value="Uno"></option>
+    <option value="Catan"></option>
+    <option value="Heat"></option>
+
+  </datalist>
+
+  <script>
+    const players = ['David', 'Katrina', 'Owen', 'Oliver', 'Charlie', 'Louie', 'Jenny', 'Laura'];
+    let dvkGames = JSON.parse(localStorage.getItem('dvkGames') || '[]');
+    let multiGames = JSON.parse(localStorage.getItem('multiGames') || '[]');
+    let eloChart, winsChart, timelineChart;
+
+    function save() {
+      localStorage.setItem('dvkGames', JSON.stringify(dvkGames));
+      localStorage.setItem('multiGames', JSON.stringify(multiGames));
+    }
+
+    function showTab(id, btn) {
+      document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderAll();
+    }
+
+    function today() { return new Date().toISOString().slice(0,10); }
+    document.getElementById('dvkDate').value = today();
+    document.getElementById('multiDate').value = today();
+
+    const playerSelect = document.getElementById('multiPlayer');
+    players.forEach(p => {
+      const opt = document.createElement('option');
+      opt.textContent = p;
+      playerSelect.appendChild(opt);
+    });
+    document.getElementById('playerPills').innerHTML = players.map(p => `<span class="pill">${p}</span>`).join(' ');
+
+    function sortDvkByDateNewest() {
+      dvkGames.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+
+    function sortMultiByDateNewest() {
+      multiGames.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+
+    function expected(a, b) {
+      return 1 / (1 + Math.pow(10, (b - a) / 400));
+    }
+
+    // ELO is calculated chronologically, even though the visible table is newest-first.
+    function calculateDvkElo() {
+      const chronological = [...dvkGames].sort((a, b) => new Date(a.date) - new Date(b.date));
+      let david = 1000, katrina = 1000;
+      const byKey = new Map();
+
+      chronological.forEach((g, index) => {
+        const expDavid = expected(david, katrina);
+        const expKatrina = expected(katrina, david);
+        let davidResult = 0.5;
+        let katrinaResult = 0.5;
+        if (g.winner === 'David') { davidResult = 1; katrinaResult = 0; }
+        if (g.winner === 'Katrina') { davidResult = 0; katrinaResult = 1; }
+        david = Math.round(david + 32 * (davidResult - expDavid));
+        katrina = Math.round(katrina + 32 * (katrinaResult - expKatrina));
+        byKey.set(g.id, { gameNo: index + 1, date: g.date, david, katrina });
+      });
+
+      return byKey;
+    }
+
+    function getEloTimeline() {
+      const chronological = [...dvkGames].sort((a, b) => new Date(a.date) - new Date(b.date));
+      let david = 1000, katrina = 1000;
+      const rows = [];
+
+      chronological.forEach((g, index) => {
+        const expDavid = expected(david, katrina);
+        const expKatrina = expected(katrina, david);
+        let davidResult = 0.5;
+        let katrinaResult = 0.5;
+        if (g.winner === 'David') { davidResult = 1; katrinaResult = 0; }
+        if (g.winner === 'Katrina') { davidResult = 0; katrinaResult = 1; }
+        david = Math.round(david + 32 * (davidResult - expDavid));
+        katrina = Math.round(katrina + 32 * (katrinaResult - expKatrina));
+        rows.push({ gameNo: index + 1, date: g.date, david, katrina });
+      });
+
+      return rows;
+    }
+
+    function getWinner(ds, ks, selected) {
+      if (selected) return selected;
+      if (ds === '' || ks === '') return '';
+      const d = Number(ds), k = Number(ks);
+      if (d > k) return 'David';
+      if (k > d) return 'Katrina';
+      return 'Draw';
+    }
+
+    function uid() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2);
+    }
+
+    function addDvkGame() {
+      const date = document.getElementById('dvkDate').value;
+      const game = document.getElementById('dvkGame').value.trim();
+      const type = document.getElementById('dvkType').value;
+      const davidScore = document.getElementById('dvkDavidScore').value;
+      const katrinaScore = document.getElementById('dvkKatrinaScore').value;
+      const winner = getWinner(davidScore, katrinaScore, document.getElementById('dvkWinner').value);
+
+      if (!date || !game || !winner) {
+        alert('Please enter a date, game, and winner. Scores are optional for win/loss games.');
+        return;
+      }
+
+      dvkGames.push({ id: uid(), date, game, type, davidScore, katrinaScore, winner });
+      sortDvkByDateNewest();
+      save();
+      renderAll();
+      document.getElementById('dvkGame').value = '';
+      document.getElementById('dvkDavidScore').value = '';
+      document.getElementById('dvkKatrinaScore').value = '';
+      document.getElementById('dvkWinner').value = '';
+    }
+
+    function addMultiRow() {
+      const row = {
+        id: uid(),
+        date: document.getElementById('multiDate').value,
+        game: document.getElementById('multiGame').value.trim(),
+        player: document.getElementById('multiPlayer').value,
+        score: document.getElementById('multiScore').value,
+        result: document.getElementById('multiResult').value
+      };
+      if (!row.date || !row.game || !row.player || !row.result) {
+        alert('Please enter date, game, player, and result. Score is optional.');
+        return;
+      }
+      multiGames.push(row);
+      sortMultiByDateNewest();
+      save();
+      renderAll();
+      document.getElementById('multiGame').value = '';
+      document.getElementById('multiScore').value = '';
+    }
+
+    function deleteDvk(id) {
+      dvkGames = dvkGames.filter(g => g.id !== id);
+      save();
+      renderAll();
+    }
+
+    function deleteMulti(id) {
+      multiGames = multiGames.filter(g => g.id !== id);
+      save();
+      renderAll();
+    }
+
+    function gameOptions(source, selectedValue) {
+      const allGames = [...new Set([...dvkGames.map(g => g.game), ...multiGames.map(g => g.game)])].sort();
+      source.innerHTML = '<option value="">All</option>' + allGames.map(g => `<option ${g === selectedValue ? 'selected' : ''}>${g}</option>`).join('');
+    }
+
+    function playerOptions(source, selectedValue) {
+      source.innerHTML = '<option value="">All</option>' + players.map(p => `<option ${p === selectedValue ? 'selected' : ''}>${p}</option>`).join('');
+    }
+
+    function withinDateRange(rowDate, from, to) {
+      if (from && rowDate < from) return false;
+      if (to && rowDate > to) return false;
+      return true;
+    }
+
+    function filteredDvkGames() {
+      const game = document.getElementById('dvkFilterGame').value;
+      const winner = document.getElementById('dvkFilterWinner').value;
+      const from = document.getElementById('dvkFilterFrom').value;
+      const to = document.getElementById('dvkFilterTo').value;
+      return dvkGames.filter(g => (!game || g.game === game) && (!winner || g.winner === winner) && withinDateRange(g.date, from, to));
+    }
+
+    function filteredMultiGames() {
+      const game = document.getElementById('multiFilterGame').value;
+      const player = document.getElementById('multiFilterPlayer').value;
+      const result = document.getElementById('multiFilterResult').value;
+      const from = document.getElementById('multiFilterFrom').value;
+      const to = document.getElementById('multiFilterTo').value;
+      return multiGames.filter(g => (!game || g.game === game) && (!player || g.player === player) && (!result || g.result === result) && withinDateRange(g.date, from, to));
+    }
+
+    function clearDvkFilters() {
+      document.getElementById('dvkFilterGame').value = '';
+      document.getElementById('dvkFilterWinner').value = '';
+      document.getElementById('dvkFilterFrom').value = '';
+      document.getElementById('dvkFilterTo').value = '';
+      renderAll();
+    }
+
+    function clearMultiFilters() {
+      document.getElementById('multiFilterGame').value = '';
+      document.getElementById('multiFilterPlayer').value = '';
+      document.getElementById('multiFilterResult').value = '';
+      document.getElementById('multiFilterFrom').value = '';
+      document.getElementById('multiFilterTo').value = '';
+      renderAll();
+    }
+
+    function renderDvk() {
+      const eloMap = calculateDvkElo();
+      const rows = filteredDvkGames();
+      let html = '<tr><th>Game #</th><th>Date</th><th>Game</th><th>Type</th><th>David</th><th>Katrina</th><th>Winner</th><th>David ELO</th><th>Katrina ELO</th><th></th></tr>';
+      rows.forEach((g) => {
+        const elo = eloMap.get(g.id) || { gameNo: '?', david: 1000, katrina: 1000 };
+        const winnerClassD = g.winner === 'David' ? 'win' : g.winner === 'Katrina' ? 'loss' : g.winner === 'Draw' ? 'draw' : '';
+        const winnerClassK = g.winner === 'Katrina' ? 'win' : g.winner === 'David' ? 'loss' : g.winner === 'Draw' ? 'draw' : '';
+        html += `<tr>
+          <td>${elo.gameNo}</td><td>${g.date}</td><td>${g.game}</td><td>${g.type}</td>
+          <td class="${winnerClassD}">${g.davidScore || '—'}</td>
+          <td class="${winnerClassK}">${g.katrinaScore || '—'}</td>
+          <td>${g.winner}</td><td>${elo.david}</td><td>${elo.katrina}</td>
+          <td><button class="danger" onclick="deleteDvk('${g.id}')">Delete</button></td>
+        </tr>`;
+      });
+      document.getElementById('dvkTable').innerHTML = html;
+    }
+
+    function renderMulti() {
+      const rows = filteredMultiGames();
+      let html = '<tr><th>Date</th><th>Game</th><th>Player</th><th>Score</th><th>Result</th><th></th></tr>';
+      rows.forEach((g) => {
+        const cls = g.result === 'Win' ? 'win' : g.result === 'Loss' ? 'loss' : 'draw';
+        html += `<tr><td>${g.date}</td><td>${g.game}</td><td>${g.player}</td><td class="${cls}">${g.score || '—'}</td><td>${g.result}</td><td><button class="danger" onclick="deleteMulti('${g.id}')">Delete</button></td></tr>`;
+      });
+      document.getElementById('multiTable').innerHTML = html;
+    }
+
+    function playerStats() {
+      return players.map(player => {
+        const multiRows = multiGames.filter(g => g.player === player);
+        const dvkWins = dvkGames.filter(g => g.winner === player).length;
+        const multiWins = multiRows.filter(g => g.result === 'Win').length;
+        const gamesPlayed = multiRows.length + (player === 'David' || player === 'Katrina' ? dvkGames.length : 0);
+        const scores = [];
+        multiRows.forEach(g => { if (g.score !== '') scores.push(Number(g.score)); });
+        if (player === 'David') dvkGames.forEach(g => { if (g.davidScore !== '') scores.push(Number(g.davidScore)); });
+        if (player === 'Katrina') dvkGames.forEach(g => { if (g.katrinaScore !== '') scores.push(Number(g.katrinaScore)); });
+        const avg = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—';
+        return { player, wins: dvkWins + multiWins, games: gamesPlayed, winPct: gamesPlayed ? Math.round(((dvkWins + multiWins)/gamesPlayed)*100) : 0, avg };
+      });
+    }
+
+    function renderStats() {
+      let html = '<tr><th>Player</th><th>Wins</th><th>Games Played</th><th>Win %</th><th>Average Score</th></tr>';
+      playerStats().forEach(s => html += `<tr><td>${s.player}</td><td>${s.wins}</td><td>${s.games}</td><td>${s.winPct}%</td><td>${s.avg}</td></tr>`);
+      document.getElementById('statsTable').innerHTML = html;
+    }
+
+    function renderOwnership() {
+      const games = [...new Set([...dvkGames.map(g => g.game), ...multiGames.map(g => g.game)])].sort();
+      let html = '<tr><th>Game</th><th>Owner</th><th>Wins</th><th>Notes</th></tr>';
+      games.forEach(game => {
+        const winMap = {};
+        players.forEach(p => winMap[p] = 0);
+        dvkGames.filter(g => g.game === game && g.winner !== 'Draw').forEach(g => winMap[g.winner]++);
+        multiGames.filter(g => g.game === game && g.result === 'Win').forEach(g => winMap[g.player]++);
+        const sorted = Object.entries(winMap).sort((a,b)=>b[1]-a[1]);
+        const owner = sorted[0][1] > 0 ? sorted[0][0] : '—';
+        const wins = sorted[0][1];
+        const tied = sorted.length > 1 && sorted[0][1] === sorted[1][1] && wins > 0;
+        html += `<tr><td>${game}</td><td>${tied ? 'Shared crown' : owner}</td><td>${wins || '—'}</td><td>${tied ? 'Tied for most wins' : owner !== '—' ? 'Current top player' : 'No wins yet'}</td></tr>`;
+      });
+      document.getElementById('ownershipTable').innerHTML = html;
+    }
+
+    function currentStreak() {
+      const chronological = [...dvkGames].sort((a, b) => new Date(a.date) - new Date(b.date));
+      if (!chronological.length) return '—';
+      const last = chronological[chronological.length - 1].winner;
+      let count = 0;
+      for (let i = chronological.length - 1; i >= 0; i--) {
+        if (chronological[i].winner === last) count++; else break;
+      }
+      return `${last} x${count}`;
+    }
+
+    function timelineByDate() {
+      const map = {};
+      dvkGames.forEach(g => {
+        if (!map[g.date]) map[g.date] = { date: g.date, davidWins: 0, katrinaWins: 0, draws: 0 };
+        if (g.winner === 'David') map[g.date].davidWins++;
+        if (g.winner === 'Katrina') map[g.date].katrinaWins++;
+        if (g.winner === 'Draw') map[g.date].draws++;
+      });
+      return Object.values(map).sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+
+    function renderDashboard() {
+      const eloRows = getEloTimeline();
+      const last = eloRows[eloRows.length - 1] || { david: 1000, katrina: 1000 };
+      document.getElementById('dashDavidElo').textContent = last.david;
+      document.getElementById('dashKatrinaElo').textContent = last.katrina;
+      document.getElementById('dashStreak').textContent = currentStreak();
+      document.getElementById('dashTotalGames').textContent = dvkGames.length + multiGames.length;
+
+      if (eloChart) eloChart.destroy();
+      eloChart = new Chart(document.getElementById('eloChart'), {
+        type: 'line',
+        data: {
+          labels: eloRows.map(r => `${r.gameNo} (${r.date})`),
+          datasets: [
+            { label: 'David ELO', data: eloRows.map(r => r.david), tension: 0.25 },
+            { label: 'Katrina ELO', data: eloRows.map(r => r.katrina), tension: 0.25 }
+          ]
+        },
+        options: { responsive: true, plugins: { legend: { labels: { color: '#f4f7fa' } } }, scales: { x: { ticks: { color: '#aeb8c2' } }, y: { ticks: { color: '#aeb8c2' } } } }
+      });
+
+      const stats = playerStats();
+      if (winsChart) winsChart.destroy();
+      winsChart = new Chart(document.getElementById('winsChart'), {
+        type: 'bar',
+        data: { labels: stats.map(s => s.player), datasets: [{ label: 'Wins', data: stats.map(s => s.wins) }] },
+        options: { responsive: true, plugins: { legend: { labels: { color: '#f4f7fa' } } }, scales: { x: { ticks: { color: '#aeb8c2' } }, y: { ticks: { color: '#aeb8c2' } } } }
+      });
+
+      const timeline = timelineByDate();
+      if (timelineChart) timelineChart.destroy();
+      timelineChart = new Chart(document.getElementById('timelineChart'), {
+        type: 'line',
+        data: {
+          labels: timeline.map(r => r.date),
+          datasets: [
+            { label: 'David Wins', data: timeline.map(r => r.davidWins), tension: 0.25 },
+            { label: 'Katrina Wins', data: timeline.map(r => r.katrinaWins), tension: 0.25 },
+            { label: 'Draws', data: timeline.map(r => r.draws), tension: 0.25 }
+          ]
+        },
+        options: { responsive: true, plugins: { legend: { labels: { color: '#f4f7fa' } } }, scales: { x: { ticks: { color: '#aeb8c2' } }, y: { ticks: { color: '#aeb8c2' } } } }
+      });
+    }
+
+    function updateFilterOptions() {
+      const dvkGameSelected = document.getElementById('dvkFilterGame').value;
+      const multiGameSelected = document.getElementById('multiFilterGame').value;
+      const multiPlayerSelected = document.getElementById('multiFilterPlayer').value;
+      gameOptions(document.getElementById('dvkFilterGame'), dvkGameSelected);
+      gameOptions(document.getElementById('multiFilterGame'), multiGameSelected);
+      playerOptions(document.getElementById('multiFilterPlayer'), multiPlayerSelected);
+    }
+
+    function exportData() {
+      const blob = new Blob([JSON.stringify({ dvkGames, multiGames }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'board-game-tracker-data.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function clearData() {
+      if (confirm('Clear all saved board game data?')) {
+        dvkGames = [];
+        multiGames = [];
+        save();
+        renderAll();
+      }
+    }
+
+    function migrateOldDataIds() {
+      let changed = false;
+      dvkGames.forEach(g => { if (!g.id) { g.id = uid(); changed = true; } });
+      multiGames.forEach(g => { if (!g.id) { g.id = uid(); changed = true; } });
+      sortDvkByDateNewest();
+      sortMultiByDateNewest();
+      if (changed) save();
+    }
+
+    function renderAll() {
+      updateFilterOptions();
+      renderDvk();
+      renderMulti();
+      renderStats();
+      renderOwnership();
+      renderDashboard();
+    }
+
+    migrateOldDataIds();
+    renderAll();
+  </script>
+</body>
+</html>
